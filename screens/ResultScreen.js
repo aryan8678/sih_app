@@ -4,11 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MOCK_DATA } from './HomeScreen'; // Import the mock data
 
 export default function ResultScreen({ route, navigation }) {
-  const { imageUri, sampleKey, isCustom } = route.params;
-  
-  // Determine which data to show
-  const dataToShow = isCustom ? null : MOCK_DATA[sampleKey];
-  const imageSource = isCustom ? { uri: imageUri } : dataToShow.image;
+  const { imageUri, sampleKey, isCustom, resultData } = route.params || {};
+
+  const sample = !isCustom && sampleKey ? MOCK_DATA[sampleKey] : null;
+  const details = resultData?.details ?? sample?.details ?? null;
+  const imageSource = imageUri ? { uri: imageUri } : sample ? sample.image : null;
 
   return (
     <LinearGradient
@@ -16,23 +16,29 @@ export default function ResultScreen({ route, navigation }) {
       style={styles.gradientContainer}
     >
       <SafeAreaView style={styles.container}>
-        <Image source={imageSource} style={styles.image} />
+        {imageSource ? (
+          <Image source={imageSource} style={styles.image} />
+        ) : (
+          <View style={[styles.image, { alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: '#5E5E5E' }}>No image</Text>
+          </View>
+        )}
 
         <View style={styles.card}>
-          {isCustom ? (
-            <Text style={styles.defaultText}>
-              Demo data is not available for custom images. This is where AI analysis would appear.
-            </Text>
-          ) : (
+          {details ? (
             <>
               <Text style={styles.cardTitle}>Classification Details</Text>
-              {Object.entries(dataToShow.details).map(([key, value]) => (
+              {Object.entries(details).map(([key, value]) => (
                 <View style={styles.row} key={key}>
                   <Text style={styles.label}>{key}:</Text>
-                  <Text style={styles.value}>{value}</Text>
+                  <Text style={styles.value}>{String(value)}</Text>
                 </View>
               ))}
             </>
+          ) : (
+            <Text style={styles.defaultText}>
+              No analysis available. Try again from Home.
+            </Text>
           )}
         </View>
 

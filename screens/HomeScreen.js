@@ -1,8 +1,9 @@
-import React from 'react';
-import { StyleSheet, Text, View, Button, Image, SafeAreaView,TouchableOpacity, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, Button, Image, SafeAreaView,TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 // gradient add kiya
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { analyzeImage, healthCheck, BASE_URL } from '../services/api';
 
 // Pre-loaded mock data
 const MOCK_DATA = {
@@ -39,6 +40,7 @@ const MOCK_DATA = {
 };
 
 export default function HomeScreen({ navigation }) {
+  const [loading, setLoading] = useState(false);
 
   const pickImage = async (isCamera) => {
     let result;
@@ -49,27 +51,53 @@ export default function HomeScreen({ navigation }) {
       quality: 1,
     };
 
-    if (isCamera) {
-      // Ask for camera permissions
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (permission.granted === false) {
-        alert('Camera access is required!');
-        return;
+    try {
+      if (isCamera) {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission required', 'Camera access is needed to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync(options);
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission required', 'Gallery access is needed to pick photos.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync(options);
       }
-      result = await ImagePicker.launchCameraAsync(options);
-    } else {
-       // Ask for gallery permissions
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permission.granted === false) {
-        alert('Gallery access is required!');
-        return;
-      }
-      result = await ImagePicker.launchImageLibraryAsync(options);
-    }
 
-    if (!result.canceled) {
-      // For any user-uploaded image, we pass its URI and a "custom" flag
-      navigation.navigate('Result', { imageUri: result.assets[0].uri, isCustom: true });
+      if (result.canceled) return;
+
+      const uri = result.assets?.[0]?.uri;
+      if (!uri) {
+        Alert.alert('Error', 'No image URI found.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await healthCheck();
+      } catch (hcErr) {
+        Alert.alert(
+          'Backend unreachable',
+          `${hcErr.message}\n\nTips:\n• If using Android emulator, set BASE_URL to http://10.0.2.2:8000\n• For device, use your PC LAN IP (e.g., http://192.168.1.x:8000)\n• Ensure the /analyze server is running and firewall allows access.`
+        );
+        return;
+      }
+
+      const analysis = await analyzeImage(uri);
+
+      navigation.navigate('Result', {
+        imageUri: uri,
+        isCustom: true,
+        resultData: analysis,
+      });
+    } catch (e) {
+      Alert.alert('Upload failed', e.message || 'Something went wrong.');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -96,12 +124,13 @@ export default function HomeScreen({ navigation }) {
 
         <View style={styles.buttonContainer}>
           {/* 3. REPLACE the old <Button> with our new custom <TouchableOpacity> button */}
-          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(true)}>
-            <Text style={styles.buttonText}>📸 Take Photo</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(true)} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? 'Uploading...' : '📸 Take Photo'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(false)}>
-            <Text style={styles.buttonText}>🖼️ Upload from Gallery</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(false)} disabled={loading}>
+            <Text style={styles.buttonText}>{loading ? 'Uploading...' : '🖼️ Upload from Gallery'}</Text>
           </TouchableOpacity>
+          {loading && <ActivityIndicator style={{ marginTop: 8 }} color="#2e7d32" />}
         </View>
         
         <View style={styles.sampleContainer}>
