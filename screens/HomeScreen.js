@@ -1,5 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View, Button, Image, SafeAreaView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Button, Image, SafeAreaView,TouchableOpacity, Platform } from 'react-native';
+// gradient add kiya
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 
 // Pre-loaded mock data
@@ -76,43 +78,134 @@ export default function HomeScreen({ navigation }) {
     navigation.navigate('Result', { sampleKey: sampleKey, isCustom: false });
   };
 
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Welcome!</Text>
-        <Text style={styles.description}>
-          Evaluate animal body structure to predict longevity, productivity, and reproductive efficiency using AI.
-        </Text>
-      </View>
-
-      <View style={styles.buttonContainer}>
-        <Button title="📸 Take Photo" onPress={() => pickImage(true)} />
-        <View style={{ marginVertical: 10 }} />
-        <Button title="🖼️ Upload Photo from Gallery" onPress={() => pickImage(false)} />
-      </View>
-      
-      <View style={styles.sampleContainer}>
-        <Text style={styles.sampleTitle}>Or Use Our Samples:</Text>
-        <View style={styles.sampleButtons}>
-           <Button title="Sample 1" onPress={() => viewSample('cow1')} />
-           <Button title="Sample 2" onPress={() => viewSample('cow2')} />
-           <Button title="Sample 3" onPress={() => viewSample('cow3')} />
+ return (
+    // 2. WRAP the entire view in the LinearGradient component
+    <LinearGradient
+      colors={['#A8CDA8', '#E8DDB5']} // A nice earthy green to a sandy beige
+      style={styles.gradientContainer}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          {/* Optional: You can add a logo/icon here */}
+          {/* <Image source={require('../assets/farm-icon.png')} style={styles.icon} /> */}
+          <Text style={styles.title}>Cattle Classifier</Text>
+          <Text style={styles.description}>
+            Use AI to evaluate the body structure of your livestock for productivity and health.
+          </Text>
         </View>
-      </View>
-    </SafeAreaView>
+
+        <View style={styles.buttonContainer}>
+          {/* 3. REPLACE the old <Button> with our new custom <TouchableOpacity> button */}
+          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(true)}>
+            <Text style={styles.buttonText}>📸 Take Photo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => pickImage(false)}>
+            <Text style={styles.buttonText}>🖼️ Upload from Gallery</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.sampleContainer}>
+          <Text style={styles.sampleTitle}>— or use our samples —</Text>
+          <View style={styles.sampleButtons}>
+            {/* 4. The sample buttons are also replaced with a different style */}
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => viewSample('cow1')}>
+               <Text style={styles.secondaryButtonText}>Sample 1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => viewSample('cow2')}>
+               <Text style={styles.secondaryButtonText}>Sample 2</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => viewSample('cow3')}>
+               <Text style={styles.secondaryButtonText}>Sample 3</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
+// 5. THE STYLESHEET is completely updated for the new look
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffffff', alignItems: 'center', padding: 20 },
-  header: { alignItems: 'center', marginBottom: 40 },
-  title: { fontSize: 32, fontWeight: 'bold', marginBottom: 10 },
-  description: { fontSize: 16, textAlign: 'center', color: '#666', paddingHorizontal: 20 },
-  buttonContainer: { width: '80%', marginBottom: 40 },
-  sampleContainer: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#ddd', paddingTop: 20, width: '100%' },
-  sampleTitle: { fontSize: 18, fontWeight: '500', color: '#444', marginBottom: 15 },
-  sampleButtons: { flexDirection: 'row', justifyContent: 'space-around', width: '100%'}
+  gradientContainer: {
+    flex: 1,
+  },
+  container: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center', // Center content vertically
+    padding: 20,
+  },
+  header: { 
+    alignItems: 'center', 
+    marginBottom: 50,
+  },
+  title: { 
+    fontSize: 36, 
+    fontWeight: '700', // A bit bolder
+    color: '#3A3A3A', // Dark text for contrast
+    marginBottom: 15,
+  },
+  description: { 
+    fontSize: 16, 
+    textAlign: 'center', 
+    color: '#5E5E5E', // A softer dark grey
+    paddingHorizontal: 20,
+    lineHeight: 24,
+  },
+  buttonContainer: { 
+    width: '90%', 
+    marginBottom: 40,
+  },
+  primaryButton: {
+    backgroundColor: '#4CAF50', // A strong, earthy green
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30, // Fully rounded corners
+    alignItems: 'center',
+    marginBottom: 15,
+    // Adding a subtle shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  sampleContainer: { 
+    alignItems: 'center', 
+    width: '100%',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(58, 58, 58, 0.2)',
+  },
+  sampleTitle: { 
+    fontSize: 16, 
+    fontWeight: '500', 
+    color: '#5E5E5E', 
+    marginBottom: 20,
+  },
+  sampleButtons: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    width: '100%',
+  },
+  secondaryButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)', // A semi-transparent white
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  secondaryButtonText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+  }
 });
 
 // We need to export this so ResultScreen can use it
