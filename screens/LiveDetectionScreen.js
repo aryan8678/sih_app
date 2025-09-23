@@ -1,25 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, AppState, TouchableOpacity } from 'react-native';
-import { Camera } from 'expo-camera';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import cattleClassificationAPI from '../services/cattleClassificationAPI';
 
 export default function LiveDetectionScreen() {
-  const [hasPermission, setHasPermission] = useState(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const cameraRef = useRef(null);
 
-  // Request Camera Permissions
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
-
   const captureAndClassify = async () => {
     if (isProcessing || !cameraRef.current) return;
-    
+
     setIsProcessing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -31,37 +23,40 @@ export default function LiveDetectionScreen() {
       const result = await cattleClassificationAPI.classifyImage(photo.base64);
       setLastResult(result);
     } catch (error) {
-      console.error("Error taking or processing picture:", error);
+      console.error('Error taking or processing picture:', error);
       setLastResult({ success: false, error: error.message });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <Text style={styles.messageText}>Requesting camera permission...</Text>
       </View>
     );
   }
-  
-  if (hasPermission === false) {
+
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.messageText}>No access to camera</Text>
+        <Text style={styles.messageText}>Camera permission not granted</Text>
+        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
-        type={Camera.Constants.Type.back}
+        facing="back"   // ✅ new API expects string, not CameraType
       />
-      
+
       {/* Result Overlay */}
       {lastResult && (
         <View style={styles.resultOverlay}>
@@ -99,10 +94,13 @@ export default function LiveDetectionScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   resultOverlay: {
     position: 'absolute',
@@ -154,5 +152,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  permissionButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
