@@ -13,25 +13,38 @@ const API_CONFIG = {
   API_ENDPOINTS: {
     CLASSIFY: '/classify',
     HEALTH: '/health',
-    BREEDS: '/breeds'
+    BREEDS: '/breeds',
+    DETECT: '/detect', // New endpoint for YOLO live detection
   },
   TIMEOUT: 30000, // 30 seconds timeout for image processing
+  DETECTION_TIMEOUT: 5000, // 5 seconds for a single live frame
 };
 
 class CattleClassificationAPI {
   constructor() {
     this.workingEndpoint = null;
     this.client = null;
+    this.detectionClient = null; // New client for JSON-based requests
     this.initializeClient();
   }
 
   initializeClient(baseURL = API_CONFIG.ENDPOINTS_TO_TRY[0]) {
+    // Standard client for multipart/form-data (image uploads)
     this.client = axios.create({
       baseURL: baseURL,
       timeout: API_CONFIG.TIMEOUT,
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+    });
+
+    // New client for application/json (live detection frames)
+    this.detectionClient = axios.create({
+        baseURL: baseURL,
+        timeout: API_CONFIG.DETECTION_TIMEOUT,
+        headers: {
+            'Content-Type': 'application/json',
+        },
     });
   }
 
@@ -51,10 +64,11 @@ class CattleClassificationAPI {
           timeout: 5000, // Shorter timeout for testing
         });
         
+        // Assuming /health is a valid endpoint for testing
         await testClient.get(API_CONFIG.API_ENDPOINTS.HEALTH);
         console.log(`✅ Working endpoint found: ${endpoint}`);
         this.workingEndpoint = endpoint;
-        this.initializeClient(endpoint);
+        this.initializeClient(endpoint); // Re-initialize both clients with the working URL
         return endpoint;
       } catch (error) {
         console.log(`❌ Endpoint ${endpoint} failed:`, error.message);
@@ -66,6 +80,43 @@ class CattleClassificationAPI {
   }
 
   /**
+   * Detect objects in a Base64 encoded image frame using YOLO model.
+   * @param {string} base64Image - Base64 encoded image string.
+   * @returns {Promise<Object>} Detection results including bounding boxes and labels.
+   */
+  async detectObjects(base64Image) {
+    try {
+      if (!this.workingEndpoint) {
+          // Find a working endpoint if not already established
+          await this.findWorkingEndpoint();
+          console.log(base64Image);
+      }
+
+      const payload = {
+        image: base64Image,
+      };
+      
+      const response = await this.detectionClient.post(API_CONFIG.API_ENDPOINTS.DETECT, payload);
+
+      if (response.data) {
+        return {
+          success: true,
+          data: response.data,
+        };
+      } else {
+        throw new Error('No data received from detection API');
+      }
+
+    } catch (error) {
+      console.error('❌ Detection API Error:', error.message);
+      return {
+        success: false,
+        error: error.message || 'Failed to detect objects',
+      };
+    }
+  }
+
+  /**
    * Classify cattle breed from image
    * @param {string} imageUri - Local image URI from ImagePicker
    * @returns {Promise<Object>} Classification results with breed and confidence scores
@@ -74,14 +125,10 @@ class CattleClassificationAPI {
     try {
       console.log('🔍 Starting classification process...');
       
-      // First, try to find a working endpoint
       const workingEndpoint = await this.findWorkingEndpoint();
       console.log('✅ Using endpoint:', workingEndpoint);
       
-      // Create FormData for image upload
       const formData = new FormData();
-      
-      // Append image file
       formData.append('image', {
         uri: imageUri,
         type: 'image/jpeg',
@@ -108,13 +155,11 @@ class CattleClassificationAPI {
       console.error('❌ Classification API Error:', error);
       console.log('🎭 Falling back to mock data due to error:', error.message);
       
-      // Show detailed error information
       if (error.response) {
         console.log('📊 Error response status:', error.response.status);
         console.log('📊 Error response data:', error.response.data);
       }
       
-      // Show user-friendly message for network issues
       if (error.message && error.message.includes('Network Error')) {
         console.log('🌐 Network Error: API server might not be running or unreachable');
       }
@@ -122,7 +167,6 @@ class CattleClassificationAPI {
       return {
         success: false,
         error: error.message || 'Failed to classify image',
-        // Return mock data as fallback for development
         data: this.getMockClassificationResult(),
       };
     }
@@ -140,10 +184,11 @@ class CattleClassificationAPI {
         console.log(`🔍 Testing connectivity to: ${endpoint}`);
         const testClient = axios.create({
           baseURL: endpoint,
-          timeout: 10000, // 10 seconds for testing
+          timeout: 10000,
         });
         
         const startTime = Date.now();
+        // Assuming the root endpoint '/' gives a basic response for connectivity tests
         const response = await testClient.get('/');
         const endTime = Date.now();
         
@@ -185,30 +230,26 @@ class CattleClassificationAPI {
    * @returns {Object} Mock classification data
    */
   getMockClassificationResult() {
-    const breeds = ['Sahiwal', 'Gir', 'Red Sindhi']; // Updated to match your model
+    // ... (This function remains unchanged)
+    const breeds = ['Sahiwal', 'Gir', 'Red Sindhi'];
     const randomIndex = Math.floor(Math.random() * breeds.length);
     const predictedBreed = breeds[randomIndex];
     
-    // Generate realistic confidence scores
     const confidenceScores = {};
     let remainingConfidence = 100;
     
     breeds.forEach((breed, index) => {
       if (breed === predictedBreed) {
-        // Predicted breed gets highest confidence (60-85%)
         confidenceScores[breed] = 60 + Math.random() * 25;
       } else if (index === breeds.length - 1) {
-        // Last breed gets remaining confidence
         confidenceScores[breed] = Math.max(0, remainingConfidence);
       } else {
-        // Other breeds get random lower confidence
         const maxRemaining = remainingConfidence * 0.6;
         confidenceScores[breed] = Math.random() * maxRemaining;
         remainingConfidence -= confidenceScores[breed];
       }
     });
 
-    // Normalize to ensure total is 100%
     const total = Object.values(confidenceScores).reduce((sum, val) => sum + val, 0);
     Object.keys(confidenceScores).forEach(breed => {
       confidenceScores[breed] = (confidenceScores[breed] / total) * 100;
@@ -237,6 +278,7 @@ class CattleClassificationAPI {
   updateConfig(config) {
     if (config.baseUrl) {
       this.client.defaults.baseURL = config.baseUrl;
+      this.detectionClient.defaults.baseURL = config.baseUrl;
     }
     if (config.timeout) {
       this.client.defaults.timeout = config.timeout;
